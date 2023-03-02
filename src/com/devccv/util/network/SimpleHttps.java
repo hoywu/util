@@ -3,6 +3,7 @@ package com.devccv.util.network;
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -166,7 +167,7 @@ public class SimpleHttps {
             if (needResponse) {
                 rawData = new StringBuilder();
                 try (InputStream inputStream = httpsURLConnection.getInputStream();
-                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream))) {
+                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                     String data;
                     while ((data = bufferedReader.readLine()) != null) {
                         rawData.append(data).append('\n');
