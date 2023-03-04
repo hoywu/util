@@ -208,7 +208,7 @@ public class WeChatPush {
         byteBuffer.put(fileAllBytes);
         byteBuffer.put(endOfPost);
 
-        return SimpleHttps.POST(url, requestProperty, byteBuffer.array()).getResponseOrElse("{}");
+        return SimpleHttps.POST(url, requestProperty, byteBuffer.array()).getResponseOrException();
     }
 
     /**
@@ -218,13 +218,10 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushTextMessage(String content) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("text");
+        JSONObject postBody = generateBaseJsonBody("text");
         postBody.put("text", new JSONObject().put("content", content));
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
     /**
@@ -239,9 +236,7 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushTextCard(String title, String description, String url, String buttonText) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("textcard");
+        JSONObject postBody = generateBaseJsonBody("textcard");
         //region textCard
         JSONObject textCard = new JSONObject();
         textCard.put("title", title);
@@ -253,8 +248,7 @@ public class WeChatPush {
         //endregion
         postBody.put("textcard", textCard);
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
     public boolean pushTextCardWithTime(String title, String description, String url, String buttonText) {
@@ -273,9 +267,7 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushImageText(String title, String description, String url, String pictureUrl) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("news");
+        JSONObject postBody = generateBaseJsonBody("news");
         //region articles
         JSONObject article = new JSONObject();
         article.put("title", title);
@@ -286,8 +278,7 @@ public class WeChatPush {
         //endregion
         postBody.put("news", new JSONObject().put("articles", articles));
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
     /**
@@ -297,13 +288,10 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushImage(String mediaID) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("image");
+        JSONObject postBody = generateBaseJsonBody("image");
         postBody.put("image", new JSONObject().put("media_id", mediaID));
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
     /**
@@ -313,13 +301,10 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushVoice(String mediaID) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("voice");
+        JSONObject postBody = generateBaseJsonBody("voice");
         postBody.put("voice", new JSONObject().put("media_id", mediaID));
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
     /**
@@ -331,13 +316,10 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushVideo(String mediaID, String title, String description) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("video");
+        JSONObject postBody = generateBaseJsonBody("video");
         postBody.put("video", new JSONObject().put("media_id", mediaID).put("title", title).put("description", description));
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
     /**
@@ -347,16 +329,13 @@ public class WeChatPush {
      * @return 是否推送成功
      */
     public boolean pushFile(String mediaID) {
-        if (!prepareToPush()) return false;
-
-        JSONObject postBody = baseJsonBodyGenerator("file");
+        JSONObject postBody = generateBaseJsonBody("file");
         postBody.put("file", new JSONObject().put("media_id", mediaID));
 
-        appPush(postBody);
-        return getErrCode() == 0;
+        return appPush(postBody);
     }
 
-    private JSONObject baseJsonBodyGenerator(String msgtype) {
+    private JSONObject generateBaseJsonBody(String msgtype) {
         JSONObject json = new JSONObject();
         json.put(pushTargetType, pushTarget);
         json.put("msgtype", msgtype);
@@ -367,13 +346,21 @@ public class WeChatPush {
         return json;
     }
 
-    private void appPush(JSONObject postBody) {
-        lastReturn = SimpleHttps.POST(PUSH_MESSAGE_URL + access_token, postBody.toString().getBytes(StandardCharsets.UTF_8)).getResponseOrElse("{}");
-        lastReturnJson = new JSONObject(lastReturn);
+    private boolean appPush(JSONObject postBody) {
+        if (!prepareToPush()) return false;
+
+        try {
+            lastReturn = SimpleHttps.POST(PUSH_MESSAGE_URL + access_token, postBody.toString().getBytes(StandardCharsets.UTF_8)).getResponseOrException();
+            lastReturnJson = new JSONObject(lastReturn);
+        } catch (IOException e) {
+            lastReturnJson = new JSONObject("{\"errmsg\": \"" + e.getMessage() + "\"}");
+        }
 
         //TODO:debug
         //System.out.println(lastReturn);
         //if (!getErrMsg().equals("ok")) System.out.println(getErrMsg());
+
+        return getErrCode() == 0;
     }
 
     //region GetResult
@@ -430,24 +417,24 @@ public class WeChatPush {
 
     /**
      * 更新access_token
-     * 出错则打印错误信息
      *
      * @return 是否更新成功
      */
     private boolean updateAccessToken() {
         try {
-            String rawData = SimpleHttps.GET(specificGetTokenURL).getResponseOrElse("{}");
+            String rawData = SimpleHttps.GET(specificGetTokenURL).getResponseOrException();
             JSONObject json = new JSONObject(rawData);
-            this.access_token = json.getString("access_token");
-            this.expiresTime = System.currentTimeMillis() + (json.getLong("expires_in") * 1000L) - (1000L);
             if (json.getInt("errcode") != 0) {
-                System.out.println(json.getString("errmsg"));
+                //System.out.println(json.getString("errmsg"));
+                lastReturnJson = json;
                 this.expiresTime = 0;
                 return false;
             }
+            this.access_token = json.getString("access_token");
+            this.expiresTime = System.currentTimeMillis() + (json.getLong("expires_in") * 1000L) - (1000L);
             return true;
-        } catch (JSONException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            lastReturnJson = new JSONObject("{\"errmsg\": \"" + e.getMessage() + "\"}");
             this.expiresTime = 0;
             return false;
         }

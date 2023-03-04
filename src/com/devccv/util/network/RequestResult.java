@@ -1,7 +1,9 @@
 package com.devccv.util.network;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * HTTP请求结果
@@ -46,6 +48,14 @@ public class RequestResult {
         if (response == null) {
             if (debugMode) exception.printStackTrace();
             return other;
+        }
+        return response;
+    }
+
+    public String getResponseOrException() throws IOException {
+        if (response == null) {
+            if (exception != null) throw new IOException(exception);
+            else throw new IOException("No Response or Exception!");
         }
         return response;
     }
